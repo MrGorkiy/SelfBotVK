@@ -1,10 +1,10 @@
-import vk_api
-from vk_api.utils import get_random_id
-from vk_api.longpoll import VkLongPoll, VkEventType
-from time import sleep
-import requests
 import json
+from time import sleep
 
+import requests
+import vk_api
+from vk_api.longpoll import VkEventType, VkLongPoll
+from vk_api.utils import get_random_id
 
 from confing import token
 
