@@ -9,7 +9,7 @@ from vk_api.utils import get_random_id
 from confing import token
 
 
-# Переопределим класс лонгпула, исключим вылеты бота при перезапуске серверов ВК
+# Переопределим класс лонгпула, исключим вылеты при перезапуске серверов ВК
 class MyLongSelfPool(VkLongPoll):
     def listen(self):
         while True:
@@ -17,7 +17,7 @@ class MyLongSelfPool(VkLongPoll):
                 for event in self.check():
                     yield event
             except Exception as e:
-                print(f'Ошибка соединения: ' + e)
+                print(f'Ошибка соединения:', e)
 
 
 vk_session = vk_api.VkApi(token=token)
@@ -41,7 +41,8 @@ def send_peer(peer_id: int, text: str, keyboard=None, attachment=None,
     :param keyboard: json с клавиатурой (необязательно)
     :param attachment: json с вложениями: фото, файлы и тд (необязательно)
     :param forward: Параметр для отправки сообщения в качестве ответа
-    :return: После успешного выполнения возвращает идентификатор отправленного сообщения.
+    :return: После успешного выполнения возвращает идентификатор отправленного
+     сообщения.
     """
     post = {
         'peer_id': peer_id,
@@ -50,11 +51,11 @@ def send_peer(peer_id: int, text: str, keyboard=None, attachment=None,
         'disable_mentions': 1
     }
 
-    if keyboard != None:
+    if keyboard is not None:
         post['keyboard'] = keyboard
-    if attachment != None:
+    if attachment is not None:
         post['attachment'] = attachment
-    if forward != None:
+    if forward is not None:
         post['forward'] = [
             json.dumps(
                 {"peer_id": peer_id, "conversation_message_ids": [forward],
@@ -74,7 +75,8 @@ def message_edit(peer_id: int, message: str, message_id: int):
 
 
 def get_name(user_id: int):
-    """Получает имя пользователя или группы и создаем обращение к нему в виде кликабельной ссылки."""
+    """Получает имя пользователя или группы и создаем обращение к нему в
+    виде кликабельной ссылки."""
     try:
         name = vk_session.method('users.get', {
             'user_ids': user_id})  # получение данных о пользователе
@@ -97,7 +99,6 @@ def events(event):
         conversation_message_id = message_type['items'][0][
             'conversation_message_id']  # id сообщения
 
-
         # Шпаргалка, можно ниже раскоментировать и потестировать и посмотреть
         # ответы и как они выглядят
         # ---------------------------------------------------------------------
@@ -105,7 +106,6 @@ def events(event):
         # забывать что тут будет только event с новыми сообщениями, хочешь
         # ловить все ивенты, такой принт надо выводить выше 87 строки
         # print(message_type)  # Данные по сообщению https://dev.vk.com/method/messages.getById
-
 
         """Тут логика программы для примера
         
@@ -139,7 +139,6 @@ def events(event):
                             f"id: {message_type['items'][0]['peer_id']}",  # Отпрвляем текст, в нем будет peer_id, в основном в нем содержится просто id пользователя
                         )  # Отправим сообщение в этот чат, откуда пришло сообщение
 
-
                 elif arg == "редакт":  # Ловим команды которые равны !редакт
                     if message_type["items"][0]["from_id"] == 25429876:  # если убрать, сработает на любого пользователя
                         message_edit(
@@ -147,7 +146,6 @@ def events(event):
                             f'Я в своем познании настолько преисполнился...',
                             event.message_id,  # Получим id сообщения, которое нам пришло в ивенте, чтобы его отредактировать
                         )  # Редактируем отправленное сообщение
-
 
                 elif arg == "ответ":  # Ловим команды которые равны !ответ
                     if message_type["items"][0]["from_id"] in [25429876, 561142571]:  # Или можно реагировать на нескольких пользователей
