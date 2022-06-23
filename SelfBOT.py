@@ -3,8 +3,11 @@ from time import sleep
 
 import requests
 import vk_api
+from io import BytesIO
+from vk_api import VkUpload
 from vk_api.longpoll import VkEventType, VkLongPoll
 from vk_api.utils import get_random_id
+from PIL import Image
 
 from confing import token
 
@@ -24,11 +27,10 @@ vk_session = vk_api.VkApi(token=token)
 vk = vk_session.get_api()
 longpoll = MyLongSelfPool(vk_session)
 
-
 print('Запустил бота, работаем')  # удобно отследить, работает бот или нет
 
 
-def send_peer(peer_id: int, text: str, keyboard=None, attachment=None,
+def send_peer(peer_id: int, text: str = None, keyboard=None, attachment=None,
               forward=None):  # Функция отправки сообщения
     """Функция отправляет сообщения в чаты по peer_id.
 
@@ -36,7 +38,7 @@ def send_peer(peer_id: int, text: str, keyboard=None, attachment=None,
 
     :param peer_id: Обязательно поле с id чата
     :type peer_id: int
-    :param text: Обязательное поле с текстом сообщения для отправки
+    :param text: Поле с текстом сообщения для отправки
     :type text: str
     :param keyboard: json с клавиатурой (необязательно)
     :param attachment: json с вложениями: фото, файлы и тд (необязательно)
@@ -46,11 +48,12 @@ def send_peer(peer_id: int, text: str, keyboard=None, attachment=None,
     """
     post = {
         'peer_id': peer_id,
-        'message': text,
         'random_id': get_random_id(),
         'disable_mentions': 1
     }
 
+    if text is not None:
+        post['message'] = text
     if keyboard is not None:
         post['keyboard'] = keyboard
     if attachment is not None:
@@ -63,14 +66,18 @@ def send_peer(peer_id: int, text: str, keyboard=None, attachment=None,
     return vk_session.method('messages.send', post)
 
 
-def message_edit(peer_id: int, message: str, message_id: int):
+def message_edit(peer_id: int, message_id: int, message: str = None,
+                 attachment=None):
     """Редактирование сообщения."""
     post = {
         "peer_id": peer_id,
-        "message": message,
         "keep_forward_messages": 1,
         "message_id": message_id,
     }
+    if message is not None:
+        post['message'] = message
+    if attachment is not None:
+        post['attachment'] = attachment
     return vk_session.method("messages.edit", post)
 
 
@@ -102,7 +109,8 @@ def events(event):
         # Шпаргалка, можно ниже раскоментировать и потестировать и посмотреть
         # ответы и как они выглядят
         # ---------------------------------------------------------------------
-        # print(event)  # Ивент который мы получили с его данными, но не стоит
+        # print(event)
+        # print(event.type)  # Ивент который мы получили с его данными, но не стоит
         # забывать что тут будет только event с новыми сообщениями, хочешь
         # ловить все ивенты, такой принт надо выводить выше 87 строки
         # print(message_type)  # Данные по сообщению https://dev.vk.com/method/messages.getById
@@ -118,42 +126,78 @@ def events(event):
         3. Ответим на сообщение с командой !ответ
         сработает если команду отправляем только указанный пользователь
         """
-        # Создам переменную arg, чтобы записать в неё аргументы будущих команд
-        arg = message[1:].split()[0]  # Убрал восклицательный знак и разделил сообщение по пробелам, взял первый элемент
-        # Так же можно поступить с peer_id и создать другие переменные, для удобства и сокращения однотипоного кода
-        # arg = message[1:].split() если создать переменную так, то можно ловить все параметры передаваемые в команде
-        # например мы захотим передать несколько параметров !прогноз Нижний Новгород - нам нужно получить команду
-        # она будет равна arg[0] (прогноз) и параметры переданные при написании команды arg[1] (нижний) и arg[2] (новгород) или arg[1:] (['нижний', 'новгород'])
 
         if message:  # Проверка на пустое сообщение, если пустое (стикер или файл, без текста) то возвращает False и не выполняется
-            if message[0] == "!":  # Ловим только команды начинающиеся с восклицательного знака
+            # Создам переменную arg, чтобы записать в неё аргументы будущих команд
+            arg = message[1:].split()[0]  # Убрал восклицательный знак и разделил сообщение по пробелам, взял первый элемент
+            # Так же можно поступить с peer_id и создать другие переменные, для удобства и сокращения однотипоного кода
+            # arg = message[1:].split() если создать переменную так, то можно ловить все параметры передаваемые в команде
+            # например мы захотим передать несколько параметров !прогноз Нижний Новгород - нам нужно получить команду
+            # она будет равна arg[0] (прогноз) и параметры переданные при написании команды arg[1] (нижний) и arg[2] (новгород) или arg[1:] (['нижний', 'новгород'])
+
+            if message[
+                0] == "!":  # Ловим только команды начинающиеся с восклицательного знака
 
                 # Для примера не будем применять переменную созданную выше (arg), а ниже применим, удобно? не правда ли!
-                if message[1:].split()[0] == "ид":  # От сообщения отсекнем первый символ [0] = !,
+                if message[1:].split()[
+                    0] == "ид":  # От сообщения отсекнем первый символ [0] = !,
                     # разделим по пробелам и возьмем первое слово, оно будет командой,
                     # к примеру сообщение: !ид, будет ['ид']
                     # а сообщение: !ид @mrgorkiy, будет ['ид', '@mrgorkiy']
-                    if message_type["items"][0]["from_id"] == 25429876:  # Проверим что отправитель сообщения это мы (наш id: 25429876)
+                    if message_type["items"][0][
+                        "from_id"] == 25429876:  # Проверим что отправитель сообщения это мы (наш id: 25429876)
                         send_peer(
-                            message_type["items"][0]["peer_id"],  # Получим peer_id чата, откуда пришло сообщение, чтобы ответить в него
-                            f"id: {message_type['items'][0]['peer_id']}",  # Отпрвляем текст, в нем будет peer_id, в основном в нем содержится просто id пользователя
+                            message_type["items"][0]["peer_id"],
+                            # Получим peer_id чата, откуда пришло сообщение, чтобы ответить в него
+                            f"id: {message_type['items'][0]['peer_id']}",
+                            # Отпрвляем текст, в нем будет peer_id, в основном в нем содержится просто id пользователя
                         )  # Отправим сообщение в этот чат, откуда пришло сообщение
 
                 elif arg == "редакт":  # Ловим команды которые равны !редакт
-                    if message_type["items"][0]["from_id"] == 25429876:  # если убрать, сработает на любого пользователя
+                    if message_type["items"][0][
+                        "from_id"] == 25429876:  # если убрать, сработает на любого пользователя
                         message_edit(
                             message_type["items"][0]["peer_id"],
+                            event.message_id,
+                            # Получим id сообщения, которое нам пришло в ивенте, чтобы его отредактировать
                             f'Я в своем познании настолько преисполнился...',
-                            event.message_id,  # Получим id сообщения, которое нам пришло в ивенте, чтобы его отредактировать
                         )  # Редактируем отправленное сообщение
 
                 elif arg == "ответ":  # Ловим команды которые равны !ответ
-                    if message_type["items"][0]["from_id"] in [25429876, 561142571]:  # Или можно реагировать на нескольких пользователей
+                    if message_type["items"][0]["from_id"] in [25429876,
+                                                               561142571]:  # Или можно реагировать на нескольких пользователей
                         send_peer(
                             message_type["items"][0]["peer_id"],
                             f"Я ответил на это сообщение",
-                            forward=conversation_message_id,  # Получаю conversation_message_id сообщения для ответа на него
+                            forward=conversation_message_id,
+                            # Получаю conversation_message_id сообщения для ответа на него
                         )  # Отправляем ответ на полученную команду
+
+                elif arg == "графит":
+                    if message_type["items"][0]["from_id"] == 25429876:
+                        upload = VkUpload(vk)
+                        if event.attachments.get('attach1_type'):
+                            if event.attachments['attach1_type'] == 'doc':
+                                vk.messages.delete(message_id=event.message_id,
+                                                   delete_for_all=1,
+                                                   peer_id=message_type["items"][0]["peer_id"])
+                                response = requests.get(
+                                    message_type['items'][0]['attachments'][0]['doc']['url'])
+                                img = Image.open(BytesIO(response.content))
+                                width, height = img.size
+                                transparent = Image.new("RGBA",
+                                                        (width, height),
+                                                        (0, 0, 0, 0))
+                                transparent.paste(img, (0, 0))
+                                transparent.save("graffiti_png.png")
+                                graffiti = upload.graffiti(
+                                    image="graffiti_png.png",
+                                    peer_id=message_type["items"][0][
+                                        "peer_id"])
+                                owner_id, graffiti_id = graffiti['graffiti']['owner_id'], graffiti['graffiti']['id']
+                                attachment = f'doc{owner_id}_{graffiti_id}'
+                                send_peer(message_type["items"][0]["peer_id"],
+                                          attachment=attachment)
 
 
 while True:  # Бесконечный цикл
